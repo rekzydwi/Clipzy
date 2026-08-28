@@ -9,7 +9,7 @@ import os
 from google import genai
 from google.genai import types
 
-MODEL = "gemini-2.5-flash"  # ada di free tier; cek ai.google.dev kalau berubah
+MODEL = "gemini-3.6-flash"  # ada di free tier (Agu 2026); cek ai.google.dev kalau berubah lagi
 
 
 def _format_timestamp(seconds: float) -> str:

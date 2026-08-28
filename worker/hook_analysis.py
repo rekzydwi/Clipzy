@@ -5,11 +5,15 @@ lewat Gemini API (free tier), plus dukungan brief campaign opsional.
 
 import json
 import os
+import time
 
 from google import genai
 from google.genai import types
+from google.genai.errors import ServerError
 
 MODEL = "gemini-3.6-flash"  # ada di free tier (Agu 2026); cek ai.google.dev kalau berubah lagi
+MAX_RETRIES = 3
+RETRY_DELAYS = [15, 45, 90]  # detik — nunggu makin lama tiap percobaan ulang
 
 
 def _format_timestamp(seconds: float) -> str:
@@ -64,14 +68,28 @@ def analyze(transcript: dict, n_clips: int = 8, brief: str | None = None) -> lis
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"].strip())
     prompt = _build_prompt(transcript, n_clips, brief)
 
-    response = client.models.generate_content(
-        model=MODEL,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            temperature=0.4,
-        ),
-    )
+    response = None
+    last_error = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            response = client.models.generate_content(
+                model=MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.4,
+                ),
+            )
+            break
+        except ServerError as e:
+            last_error = e
+            if attempt < MAX_RETRIES - 1:
+                delay = RETRY_DELAYS[attempt]
+                print(f"  Gemini lagi sibuk (percobaan {attempt + 1}/{MAX_RETRIES}), nunggu {delay}s...")
+                time.sleep(delay)
+
+    if response is None:
+        raise RuntimeError(f"Gemini tetap gagal setelah {MAX_RETRIES}x percobaan: {last_error}")
 
     try:
         raw_clips = json.loads(response.text)

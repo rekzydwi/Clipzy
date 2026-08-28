@@ -1,9 +1,6 @@
 """
 hook_analysis.py — Analisis transkrip buat cari momen terbaik + hook, otomatis
 lewat Gemini API (free tier), plus dukungan brief campaign opsional.
-
-Ini versi otomatis dari alur "copy-paste ke claude.ai" di toolkit lokal — perlu
-diotomatiskan karena worker ini jalan tanpa manusia di depan layar.
 """
 
 import json
@@ -64,11 +61,7 @@ Transkrip:
 
 
 def analyze(transcript: dict, n_clips: int = 8, brief: str | None = None) -> list[dict]:
-    """
-    Return list of dict: {start_time, end_time, hook_text, reason} — sudah divalidasi
-    (durasi masuk akal, nggak keluar batas video, terurut).
-    """
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"].strip())
     prompt = _build_prompt(transcript, n_clips, brief)
 
     response = client.models.generate_content(
@@ -93,7 +86,7 @@ def analyze(transcript: dict, n_clips: int = 8, brief: str | None = None) -> lis
             end = min(float(duration), float(c["end_time"]))
         except (KeyError, TypeError, ValueError):
             continue
-        if end - start < 5:  # klip kependekan, kemungkinan hasil parsing yang aneh
+        if end - start < 5:
             continue
         validated.append({
             "start_time": round(start, 2),

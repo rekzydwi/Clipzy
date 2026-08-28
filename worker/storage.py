@@ -1,6 +1,9 @@
 """
 storage.py — Wrapper tipis di atas Cloudflare R2 (API-nya S3-compatible, jadi
 pakai boto3 biasa, cuma beda endpoint_url).
+
+Semua env var di-.strip() — jaga-jaga kalau ada spasi/newline nyasar ke-copy pas
+isi GitHub Secrets (kejadian umum, endpoint jadi rusak kalau nggak dibersihin).
 """
 
 import os
@@ -11,18 +14,18 @@ import boto3
 
 @lru_cache(maxsize=1)
 def get_client():
-    account_id = os.environ["R2_ACCOUNT_ID"]
+    account_id = os.environ["R2_ACCOUNT_ID"].strip()
     return boto3.client(
         "s3",
         endpoint_url=f"https://{account_id}.r2.cloudflarestorage.com",
-        aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
-        aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"],
+        aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"].strip(),
+        aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"].strip(),
         region_name="auto",
     )
 
 
 def bucket_name() -> str:
-    return os.environ["R2_BUCKET_NAME"]
+    return os.environ["R2_BUCKET_NAME"].strip()
 
 
 def download_file(key: str, local_path: str) -> None:

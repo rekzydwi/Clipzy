@@ -14,8 +14,8 @@ from supabase import create_client, Client
 
 @lru_cache(maxsize=1)
 def get_client() -> Client:
-    url = os.environ["SUPABASE_URL"]
-    key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+    url = os.environ["SUPABASE_URL"].strip()
+    key = os.environ["SUPABASE_SERVICE_ROLE_KEY"].strip()
     return create_client(url, key)
 
 
@@ -33,10 +33,6 @@ def mark_job_failed(job_id: str, error_message: str) -> None:
 
 
 def insert_clips(job_id: str, clips: list[dict]) -> list[dict]:
-    """
-    clips: list of {idx, start_time, end_time, hook_text, reason}
-    Return: baris yang berhasil di-insert (lengkap dengan id dari DB)
-    """
     rows = [{**c, "job_id": job_id, "status": "pending"} for c in clips]
     res = get_client().table("clips").insert(rows).execute()
     return res.data

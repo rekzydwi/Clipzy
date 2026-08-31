@@ -42,15 +42,19 @@ export async function POST(request: NextRequest) {
 
     if (dbError) {
       console.error("DB insert error:", dbError);
-      return NextResponse.json({ error: "Gagal membuat job" }, { status: 500 });
+      return NextResponse.json(
+        { error: `Gagal membuat job: ${dbError.message}` },
+        { status: 500 }
+      );
     }
 
     // Generate presigned upload URL
     const uploadUrl = await getPresignedUploadUrl(sourceVideoKey, contentType || "video/mp4");
 
     return NextResponse.json({ jobId, uploadUrl });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("POST /api/jobs error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

@@ -3,8 +3,9 @@ pipeline.py — Orkestrator utama, dipanggil GitHub Actions:
     python worker/pipeline.py <job_id>
 
 Alur: download video dari R2 -> transkripsi -> analisis Gemini (+ brief kalau ada)
--> insert klip ke DB -> render tiap klip (simpan crop_keyframes & caption_words biar
-bisa dipakai ulang saat user edit) -> upload ke R2 -> update status jadi 'ready'.
+-> insert klip ke DB -> render tiap klip (dengan hook teaser prepend + caption,
+simpan crop_keyframes & caption_words biar bisa dipakai ulang saat user edit)
+-> upload ke R2 -> update status jadi 'ready'.
 
 Kalau ada tahap manapun yang gagal, job ditandai 'failed' dengan pesan error di DB
 (biar keliatan di UI), dan proses exit dengan kode error (biar run di GitHub Actions
@@ -58,6 +59,8 @@ def run(job_id: str) -> None:
                 "idx": i + 1,
                 "start_time": c["start_time"],
                 "end_time": c["end_time"],
+                "hook_start": c["hook_start"],
+                "hook_end": c["hook_end"],
                 "hook_text": c["hook_text"],
                 "reason": c["reason"],
             }
@@ -73,7 +76,9 @@ def run(job_id: str) -> None:
         for i, clip in enumerate(clip_rows, 1):
             clip_id = clip["id"]
             start, end = clip["start_time"], clip["end_time"]
-            print(f"  [{i}/{len(clip_rows)}] {start:.0f}s-{end:.0f}s | {clip['hook_text']}")
+            hook_start = clip.get("hook_start")
+            hook_end = clip.get("hook_end")
+            print(f"  [{i}/{len(clip_rows)}] {start:.0f}s-{end:.0f}s | hook: {hook_start}-{hook_end}s | {clip['hook_text']}")
             db.update_clip(clip_id, status="rendering")
 
             try:
@@ -86,7 +91,10 @@ def run(job_id: str) -> None:
                 out_video = tmp / f"clip_{i:02d}.mp4"
                 render_clip.render_clip(
                     str(video_path), crop_w, crop_h, crop_x, crop_y,
-                    words, start, end, str(out_video), hook_text=clip["hook_text"],
+                    words, start, end, str(out_video),
+                    hook_start=hook_start,
+                    hook_end=hook_end,
+                    hook_text=clip.get("hook_text"),
                 )
                 out_thumb = tmp / f"clip_{i:02d}.jpg"
                 render_clip.make_thumbnail(str(video_path), start + 1.5, str(out_thumb))

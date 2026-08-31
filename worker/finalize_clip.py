@@ -5,7 +5,8 @@ frontend:
 
 Ini yang bikin fitur "edit sebelum download" tetap cepat: nggak whisper ulang,
 nggak deteksi wajah ulang. Cuma baca ulang caption_words & crop_keyframes yang
-sudah tersimpan di DB (sudah termasuk editan user), lalu render ulang video-nya.
+sudah tersimpan di DB (sudah termasuk editan user), lalu render ulang video-nya
+(termasuk hook teaser prepend).
 """
 
 import sys
@@ -36,6 +37,8 @@ def run(clip_id: str) -> None:
         start, end = clip["start_time"], clip["end_time"]
         keyframes = clip.get("crop_keyframes") or []
         words = clip.get("caption_words") or []
+        hook_start = clip.get("hook_start")
+        hook_end = clip.get("hook_end")
 
         src_w, src_h = render_clip.get_resolution(str(video_path))
         crop_w, crop_h, crop_x, crop_y = render_clip.crop_from_keyframes(
@@ -46,7 +49,10 @@ def run(clip_id: str) -> None:
         print("Render ulang (pakai data yang sudah ada, tanpa whisper/mediapipe ulang)...")
         render_clip.render_clip(
             str(video_path), crop_w, crop_h, crop_x, crop_y,
-            words, start, end, str(out_video), hook_text=clip.get("hook_text"),
+            words, start, end, str(out_video),
+            hook_start=hook_start,
+            hook_end=hook_end,
+            hook_text=clip.get("hook_text"),
         )
 
         rendered_key = f"clips/{clip['job_id']}/{clip_id}/render.mp4"

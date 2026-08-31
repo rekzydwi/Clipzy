@@ -1,13 +1,13 @@
 """
-render_clip.py (versi worker) — Sama seperti versi lokal (crop 9:16 face-tracking,
-caption otomatis, hook overlay), TAPI sekarang:
+render_clip.py (versi worker) — Crop 9:16 face-tracking, caption otomatis,
+dan hook teaser (3 detik potongan video diprepend di awal klip).
 
-1. Input klip datang dari baris DB (start_time/end_time/hook_text), bukan parsing
-   teks hasil paste manual.
-2. crop_keyframes & caption_words disimpan dengan timestamp ABSOLUT (relatif ke video
-   sumber, bukan relatif ke klip) — supaya kalau user geser trim di editor nanti,
-   finalize_clip.py tinggal filter ulang rentang yang relevan tanpa perlu jalanin
-   mediapipe/whisper lagi.
+Hook teaser = potongan singkat paling bikin penasaran dari dalam klip itu sendiri,
+ditaruh di awal sebagai pemancing sebelum klip utama diputar. Bukan teks overlay.
+
+Data crop_keyframes & caption_words disimpan dengan timestamp ABSOLUT (relatif ke
+video sumber) — supaya kalau user geser trim, finalize_clip.py tinggal filter
+ulang tanpa perlu jalanin mediapipe/whisper lagi.
 """
 
 import subprocess
@@ -114,23 +114,27 @@ def _sec_to_ass_ts(t: float) -> str:
     return f"{h:d}:{m:02d}:{s:05.2f}"
 
 
-def build_captions_ass(words: list[dict], clip_start: float, out_path: str, words_per_chunk: int = 4):
-    """words pakai timestamp absolut — clip_start dipakai buat geser jadi relatif ke klip."""
+def build_captions_ass(words: list[dict], clip_start: float, out_path: str,
+                       time_offset: float = 0.0, words_per_chunk: int = 4):
+    """
+    words pakai timestamp absolut — clip_start dipakai buat geser jadi relatif ke klip.
+    time_offset: tambahan offset di awal (misalnya durasi hook teaser yang diprepend).
+    """
     lines = [ASS_HEADER]
     chunk = []
     for w in words:
         chunk.append(w)
         if len(chunk) >= words_per_chunk:
-            lines.append(_chunk_to_ass_line(chunk, clip_start))
+            lines.append(_chunk_to_ass_line(chunk, clip_start, time_offset))
             chunk = []
     if chunk:
-        lines.append(_chunk_to_ass_line(chunk, clip_start))
+        lines.append(_chunk_to_ass_line(chunk, clip_start, time_offset))
     Path(out_path).write_text("".join(lines), encoding="utf-8")
 
 
-def _chunk_to_ass_line(chunk: list[dict], clip_start: float) -> str:
-    start = _sec_to_ass_ts(chunk[0]["start"] - clip_start)
-    end = _sec_to_ass_ts(chunk[-1]["end"] - clip_start)
+def _chunk_to_ass_line(chunk: list[dict], clip_start: float, time_offset: float = 0.0) -> str:
+    start = _sec_to_ass_ts(chunk[0]["start"] - clip_start + time_offset)
+    end = _sec_to_ass_ts(chunk[-1]["end"] - clip_start + time_offset)
     text = " ".join(w["word"] for w in chunk).upper()
     return f"Dialogue: 0,{start},{end},Caption,,0,0,0,,{text}\n"
 
@@ -139,7 +143,7 @@ def _ffmpeg_escape(path: str) -> str:
     return path.replace("\\", "/").replace(":", r"\:")
 
 
-# ---------- render utama ----------
+# ---------- render utama (dengan hook teaser prepend) ----------
 
 def render_clip(
     video_path: str,
@@ -148,41 +152,116 @@ def render_clip(
     clip_start: float,
     clip_end: float,
     out_path: str,
-    hook_text: str | None = None,
+    hook_start: float | None = None,
+    hook_end: float | None = None,
+    hook_text: str | None = None,  # kept for backward compat, not burned anymore
     font_path: str = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
 ):
-    ass_path = Path(out_path).with_suffix(".ass")
-    build_captions_ass(words, clip_start, str(ass_path))
+    """
+    Render klip 9:16 dengan caption otomatis.
 
-    vf_parts = [
-        f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}",
-        "scale=1080:1920",
-        f"subtitles='{_ffmpeg_escape(str(ass_path))}'",
-    ]
+    Kalau hook_start/hook_end tersedia, potongan 3 detik itu di-render terpisah
+    (dengan efek zoom ringan) lalu diprepend ke awal klip utama. Hasilnya:
+    [hook teaser 3s] → [klip utama dengan caption].
+    """
+    out_path = Path(out_path)
+    tmp_dir = out_path.parent
 
-    if hook_text:
-        text = hook_text.replace("'", r"\'").replace(":", r"\:")
-        vf_parts.append(
-            "drawtext=fontfile='%s':text='%s':fontcolor=white:fontsize=70:"
-            "box=1:boxcolor=black@0.55:boxborderw=20:x=(w-text_w)/2:y=180:"
-            "enable='between(t,0,3)'" % (font_path, text)
+    crop_vf = f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y},scale=1080:1920"
+
+    # --- cek apakah ada hook teaser ---
+    has_hook = (
+        hook_start is not None
+        and hook_end is not None
+        and hook_end > hook_start
+        and hook_end - hook_start >= 0.5
+    )
+
+    if has_hook:
+        hook_duration = hook_end - hook_start
+
+        # 1. Render hook teaser (sedikit zoom in untuk efek pembeda)
+        hook_path = tmp_dir / f"{out_path.stem}_hook.mp4"
+        hook_vf = f"{crop_vf},zoompan=z='1.05':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1080x1920:fps=30"
+        # Simpler approach: just slight scale up & crop back
+        hook_vf = f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y},scale=1134:2016,crop=1080:1920"
+        cmd_hook = [
+            "ffmpeg", "-y",
+            "-ss", str(hook_start),
+            "-i", video_path,
+            "-t", str(hook_duration),
+            "-vf", hook_vf,
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+            "-c:a", "aac", "-b:a", "128k",
+            str(hook_path),
+        ]
+        result = subprocess.run(cmd_hook, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"  Warning: hook teaser render gagal, lanjut tanpa hook: {result.stderr[-500:]}")
+            has_hook = False
+
+    if has_hook:
+        # 2. Render klip utama DENGAN caption (offset waktu caption memperhitungkan hook)
+        main_path = tmp_dir / f"{out_path.stem}_main.mp4"
+        ass_path = out_path.with_suffix(".ass")
+        build_captions_ass(words, clip_start, str(ass_path), time_offset=0.0)
+
+        main_vf = f"{crop_vf},subtitles='{_ffmpeg_escape(str(ass_path))}'"
+        cmd_main = [
+            "ffmpeg", "-y",
+            "-ss", str(clip_start),
+            "-i", video_path,
+            "-t", str(clip_end - clip_start),
+            "-vf", main_vf,
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+            "-c:a", "aac", "-b:a", "128k",
+            str(main_path),
+        ]
+        result = subprocess.run(cmd_main, capture_output=True, text=True)
+        ass_path.unlink(missing_ok=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"ffmpeg gagal render klip utama:\n{result.stderr[-2000:]}")
+
+        # 3. Concat: hook teaser + klip utama
+        concat_list = tmp_dir / f"{out_path.stem}_concat.txt"
+        concat_list.write_text(
+            f"file '{hook_path.name}'\nfile '{main_path.name}'\n",
+            encoding="utf-8",
         )
+        cmd_concat = [
+            "ffmpeg", "-y",
+            "-f", "concat", "-safe", "0",
+            "-i", str(concat_list),
+            "-c", "copy",
+            str(out_path),
+        ]
+        result = subprocess.run(cmd_concat, capture_output=True, text=True)
+        # cleanup temp files
+        hook_path.unlink(missing_ok=True)
+        main_path.unlink(missing_ok=True)
+        concat_list.unlink(missing_ok=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"ffmpeg gagal concat hook+klip:\n{result.stderr[-2000:]}")
+    else:
+        # Fallback: render biasa tanpa hook teaser (sama seperti sebelumnya)
+        ass_path = out_path.with_suffix(".ass")
+        build_captions_ass(words, clip_start, str(ass_path))
 
-    vf = ",".join(vf_parts)
-    cmd = [
-        "ffmpeg", "-y",
-        "-ss", str(clip_start),
-        "-i", video_path,
-        "-t", str(clip_end - clip_start),
-        "-vf", vf,
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-        "-c:a", "aac", "-b:a", "128k",
-        str(out_path),
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    ass_path.unlink(missing_ok=True)
-    if result.returncode != 0:
-        raise RuntimeError(f"ffmpeg gagal render klip:\n{result.stderr[-2000:]}")
+        vf = f"{crop_vf},subtitles='{_ffmpeg_escape(str(ass_path))}'"
+        cmd = [
+            "ffmpeg", "-y",
+            "-ss", str(clip_start),
+            "-i", video_path,
+            "-t", str(clip_end - clip_start),
+            "-vf", vf,
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+            "-c:a", "aac", "-b:a", "128k",
+            str(out_path),
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        ass_path.unlink(missing_ok=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"ffmpeg gagal render klip:\n{result.stderr[-2000:]}")
 
 
 def make_thumbnail(video_path: str, at_second: float, out_path: str):

@@ -1,41 +1,68 @@
-# AI Video Clipper (Web, Hosted)
+# Clipzy — AI Video Clipper
 
-Versi hosted dari AI video clipper — upload video panjang, dapat beberapa klip
-pendek 9:16 dengan caption otomatis dan hook di 3 detik pertama, siap upload ke
-TikTok/Reels/Shorts.
+Upload video panjang, dapat klip pendek **9:16** dengan **hook teaser 3 detik** &
+**caption otomatis**, siap upload ke TikTok, Reels, dan Shorts.
 
-**Status**: Milestone 1 — worker pipeline (belum ada frontend, sengaja).
+## Fitur
 
-## Kenapa belum ada frontend?
+- 🎯 **Hook Teaser** — AI memilih momen paling bikin penasaran dari klip, dipotong
+  3 detik dan ditaruh di awal sebagai pemancing
+- 🎙️ **Transkripsi Otomatis** — faster-whisper (CPU, gratis, offline)
+- 🧠 **Analisis AI** — Gemini menganalisis transkrip, pilih momen terbaik, dukung
+  brief campaign opsional
+- 📱 **9:16 Face-Tracking Crop** — mediapipe deteksi wajah, auto-crop portrait
+- 💬 **Caption Otomatis** — kata per kata, posisi & timing presisi
+- ⚡ **Realtime Status** — UI otomatis ter-update saat processing selesai
+- 🔒 **Invite-Only Auth** — Supabase Auth, 3 user
 
-Sebelum bangun UI, kita pastikan dulu bagian paling berisiko — pipeline AI (whisper,
-Gemini, ffmpeg+face-tracking) — beneran jalan mulus di lingkungan GitHub Actions,
-yang beda dari laptop lokal (nggak ada GPU, resource terbatas). Lihat
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) untuk desain teknis lengkap, dan
-[`SETUP-MILESTONE-1.md`](SETUP-MILESTONE-1.md) untuk cara setup & testing sekarang.
-
-## Struktur
+## Arsitektur
 
 ```
-worker/     — script Python yang dijalankan GitHub Actions (bukan Vercel)
-.github/    — workflow trigger manual buat testing pipeline
-docs/       — desain arsitektur lengkap
+apps/web/     → Next.js 15 (App Router) — deploy ke Vercel
+worker/       → Python pipeline — jalan di GitHub Actions (gratis)
+.github/      → Workflow: process-video & finalize-clip
 ```
 
-## Alur singkat
+**Pipeline**: Upload → R2 → GitHub Actions → Whisper → Gemini → ffmpeg → R2 → Selesai
 
-1. Video mentah di-upload ke Cloudflare R2, row baru dibuat di tabel `jobs` (Supabase)
-2. GitHub Actions terpicu, jalanin `worker/pipeline.py <job_id>`
-3. Pipeline: transkripsi (faster-whisper) → analisis momen & hook (Gemini, + brief
-   campaign opsional) → render tiap klip (ffmpeg + face-tracking crop + caption)
-4. Hasil naik ke R2, status job jadi `ready`
-5. (Milestone berikutnya) User review & edit lewat frontend, klik finalize kalau ada
-   perubahan → `worker/finalize_clip.py` render ulang ringan tanpa whisper/mediapipe
-   ulang, karena data face-tracking & caption sudah tersimpan di DB
+Lihat [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) untuk desain teknis lengkap.
+
+## Setup & Deploy
+
+### 1. Supabase
+
+- Buat project di [supabase.com](https://supabase.com)
+- Jalankan schema SQL dari [`SETUP-MILESTONE-1.md`](SETUP-MILESTONE-1.md)
+- Jalankan migration dari [`docs/migration-hook-and-rls.sql`](docs/migration-hook-and-rls.sql)
+- Matikan "Enable sign up" di Authentication → Settings
+- Invite user lewat Authentication → Users → Invite
+
+### 2. Cloudflare R2
+
+- Buat bucket di [dash.cloudflare.com](https://dash.cloudflare.com) → R2
+- Buat API token dengan Object Read & Write
+
+### 3. GitHub Secrets
+
+Tambahkan di Settings → Secrets → Actions:
+`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
+`R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `GEMINI_API_KEY`
+
+### 4. Vercel
+
+- Import repo, set Root Directory = `apps/web`
+- Tambahkan env vars (lihat `apps/web/.env.example`)
+- Buat fine-grained PAT di GitHub → Settings → Developer → Personal Access Tokens
+  (scope: Actions write, repo ini saja) → set sebagai `GITHUB_PAT`
+
+### 5. Gemini API Key
+
+- Dapatkan gratis di [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
 
 ## Roadmap
 
-- [x] Milestone 1 — worker pipeline jalan di GitHub Actions (trigger manual)
-- [ ] Milestone 2 — frontend minimal (upload, status, download)
-- [ ] Milestone 3 — review & edit UI + finalize flow
-- [ ] Milestone 4 — auth 3 user, polish UI, auto-cleanup storage
+- [x] Milestone 1 — Worker pipeline (GitHub Actions)
+- [x] Milestone 2 — Frontend (Next.js: upload, dashboard, status realtime)
+- [x] Milestone 3 — Review klip & download
+- [x] Milestone 4 — Auth, RLS, deploy
+- [ ] Milestone 5 — Edit caption & re-render UI

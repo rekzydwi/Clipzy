@@ -1,6 +1,10 @@
 """
 hook_analysis.py — Analisis transkrip buat cari momen terbaik + hook, otomatis
 lewat Gemini API (free tier), plus dukungan brief campaign opsional.
+
+Hook = potongan 3 detik dari video klip itu sendiri yang paling bikin penasaran
+(kalimat kontroversial, pertanyaan provokatif, klaim mengejutkan). Potongan ini
+akan diprepend di awal klip sebagai teaser — bukan teks yang di-overlay.
 """
 
 import json
@@ -46,16 +50,27 @@ TUGAS: cari {n_clips} momen terbaik untuk dijadikan klip pendek (30-90 detik),
 prioritaskan momen dengan potensi HOOK KUAT di 3 detik pertama — klaim kontroversial/
 mengejutkan, curiosity gap, cerita dengan setup+payoff lengkap, atau kalimat quotable.
 
-Kalau kalimat pembuka asli lemah, isi "hook_text" dengan teks hook BUATAN (bukan dari
-transkrip) yang cocok di-overlay di 3 detik pertama sebagai pemancing perhatian.
+Untuk setiap klip, tentukan juga "hook moment" — yaitu potongan singkat (2-3 detik)
+DARI DALAM rentang klip itu sendiri yang paling bikin penonton penasaran. Potongan
+ini akan ditaruh di awal klip sebagai teaser sebelum klip utama diputar. Pilih
+momen yang menyisakan pertanyaan atau membuat penonton berpikir "apa maksudnya?".
+
+Hook moment HARUS berada di dalam rentang [start_time, end_time] klip.
 
 Balas HANYA dengan JSON array (tanpa markdown code fence, tanpa teks lain), format:
 [
-  {{"start_time": <detik, angka>, "end_time": <detik, angka>, "hook_text": "...", "reason": "..."}},
+  {{
+    "start_time": <detik, angka desimal>,
+    "end_time": <detik, angka desimal>,
+    "hook_start": <detik, angka desimal — awal hook moment>,
+    "hook_end": <detik, angka desimal — akhir hook moment, selisih ~2-3 detik>,
+    "hook_text": "<ringkasan singkat isi hook, untuk ditampilkan di UI>",
+    "reason": "<kenapa momen ini berpotensi viral>"
+  }},
   ...
 ]
-Urutkan dari yang paling berpotensi viral. start_time dan end_time dalam detik
-(angka desimal), diukur dari awal video.
+Urutkan dari yang paling berpotensi viral. Semua waktu dalam detik (angka desimal),
+diukur dari awal video.
 
 Transkrip:
 ---
@@ -106,9 +121,22 @@ def analyze(transcript: dict, n_clips: int = 8, brief: str | None = None) -> lis
             continue
         if end - start < 5:
             continue
+
+        # hook_start/hook_end: fallback ke 3 detik pertama klip kalau Gemini nggak isi
+        hook_start = float(c.get("hook_start", start))
+        hook_end = float(c.get("hook_end", start + 3))
+        # pastikan hook ada di dalam rentang klip
+        hook_start = max(start, min(hook_start, end - 2))
+        hook_end = max(hook_start + 1, min(hook_end, end))
+        # batasi durasi hook maks 4 detik
+        if hook_end - hook_start > 4:
+            hook_end = hook_start + 3
+
         validated.append({
             "start_time": round(start, 2),
             "end_time": round(end, 2),
+            "hook_start": round(hook_start, 2),
+            "hook_end": round(hook_end, 2),
             "hook_text": str(c.get("hook_text", "")).strip(),
             "reason": str(c.get("reason", "")).strip(),
         })

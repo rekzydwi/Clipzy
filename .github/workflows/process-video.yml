@@ -1,6 +1,10 @@
-name: Process video (manual test)
+name: Process video
 
 on:
+  # Trigger otomatis dari API (frontend)
+  repository_dispatch:
+    types: [process-video]
+  # Trigger manual dari GitHub UI (testing)
   workflow_dispatch:
     inputs:
       job_id:
@@ -37,4 +41,7 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python pipeline.py "${{ inputs.job_id }}"
+        run: |
+          # Ambil job_id dari repository_dispatch ATAU workflow_dispatch
+          JOB_ID="${{ github.event.client_payload.job_id || inputs.job_id }}"
+          python pipeline.py "$JOB_ID"

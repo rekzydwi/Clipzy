@@ -38,6 +38,44 @@ export default function JobDetailPage() {
   const [clipUrls, setClipUrls] = useState<Record<string, string>>({});
   const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
   const [downloading, setDownloading] = useState<Record<string, boolean>>({});
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState("");
+
+  async function handleStartJob() {
+    setActionLoading(true);
+    setActionError("");
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/start`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Gagal memulai processing");
+      }
+      fetchData();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Terjadi kesalahan";
+      setActionError(msg);
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleDeleteJob() {
+    if (!confirm("Hapus project video ini?")) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/jobs/${jobId}`, { method: "DELETE" });
+      if (res.ok) {
+        router.push("/dashboard");
+      } else {
+        const data = await res.json();
+        alert(data.error || "Gagal menghapus project");
+      }
+    } catch (err) {
+      console.error("Gagal menghapus:", err);
+    } finally {
+      setActionLoading(false);
+    }
+  }
 
   const fetchData = useCallback(async () => {
     const { data: jobData } = await supabase
@@ -223,7 +261,40 @@ export default function JobDetailPage() {
                 </p>
               )}
             </div>
+
+            <div className="flex items-center gap-2">
+              {job.status === "uploaded" && (
+                <button
+                  onClick={handleStartJob}
+                  disabled={actionLoading}
+                  className="btn-primary"
+                  id="start-job-btn"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                  </svg>
+                  {actionLoading ? "Memulai..." : "Mulai Proses AI"}
+                </button>
+              )}
+              <button
+                onClick={handleDeleteJob}
+                disabled={actionLoading}
+                className="btn-secondary text-danger hover:bg-danger/10"
+                id="delete-job-btn"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                Hapus
+              </button>
+            </div>
           </div>
+          {actionError && (
+            <div className="mt-3 p-3 rounded-lg bg-danger/10 border border-danger/30 text-danger text-sm animate-fade-in">
+              {actionError}
+            </div>
+          )}
         </div>
 
         {/* Processing Steps — tampilkan saat masih proses */}
@@ -260,11 +331,22 @@ export default function JobDetailPage() {
                 );
               })}
             </div>
-            <p className="text-sm text-muted-foreground mt-4">
-              {isProcessing(job.status)
-                ? "Pipeline AI sedang berjalan di cloud... halaman ini akan otomatis ter-update."
-                : "Menunggu proses dimulai..."}
-            </p>
+            <div className="flex items-center justify-between mt-4">
+              <p className="text-sm text-muted-foreground">
+                {isProcessing(job.status)
+                  ? "Pipeline AI sedang berjalan di cloud... halaman ini akan otomatis ter-update."
+                  : "Video sudah terupload ke cloud. Klik tombol 'Mulai Proses AI' jika proses belum berjalan otomatis."}
+              </p>
+              {job.status === "uploaded" && (
+                <button
+                  onClick={handleStartJob}
+                  disabled={actionLoading}
+                  className="btn-primary text-xs py-1.5 px-3 shrink-0"
+                >
+                  ▶️ Mulai Proses Sekarang
+                </button>
+              )}
+            </div>
           </div>
         )}
 

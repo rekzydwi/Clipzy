@@ -50,6 +50,22 @@ export default function DashboardPage() {
     };
   }, [fetchJobs, supabase]);
 
+  async function handleDeleteJob(e: React.MouseEvent, jobId: string) {
+    e.stopPropagation();
+    if (!confirm("Hapus project video ini?")) return;
+    try {
+      const res = await fetch(`/api/jobs/${jobId}`, { method: "DELETE" });
+      if (res.ok) {
+        setJobs((prev) => prev.filter((j) => j.id !== jobId));
+      } else {
+        const data = await res.json();
+        alert(data.error || "Gagal menghapus project");
+      }
+    } catch (err) {
+      console.error("Gagal menghapus:", err);
+    }
+  }
+
   function handleUploadComplete(jobId: string) {
     setShowUpload(false);
     router.push(`/jobs/${jobId}`);
@@ -128,7 +144,7 @@ export default function DashboardPage() {
         ) : (
           <div className="space-y-3 stagger-children">
             {jobs.map((job) => (
-              <button
+              <div
                 key={job.id}
                 onClick={() => router.push(`/jobs/${job.id}`)}
                 className="glass-card p-5 w-full text-left flex items-center gap-4 group cursor-pointer"
@@ -183,6 +199,20 @@ export default function DashboardPage() {
                   )}
                 </div>
 
+                {/* Actions */}
+                <button
+                  onClick={(e) => handleDeleteJob(e, job.id)}
+                  className="p-2 rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+                  title="Hapus Project"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                  </svg>
+                </button>
+
                 {/* Arrow */}
                 <svg
                   className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-all group-hover:translate-x-1"
@@ -194,7 +224,7 @@ export default function DashboardPage() {
                 >
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
-              </button>
+              </div>
             ))}
           </div>
         )}

@@ -47,8 +47,9 @@ export async function POST(
     await admin.from("jobs").update({ status: "transcribing" }).eq("id", jobId);
 
     return NextResponse.json({ ok: true });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("POST /api/jobs/:id/start error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

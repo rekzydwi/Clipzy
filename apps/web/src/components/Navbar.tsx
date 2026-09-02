@@ -15,56 +15,59 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="border-b border-border bg-card/50 backdrop-blur-md sticky top-0 z-40">
+    <nav className="border-b border-[var(--glass-border)] bg-[rgba(8,11,17,0.75)] backdrop-blur-xl sticky top-0 z-40 transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2 group">
-            <svg
-              width="32"
-              height="32"
-              viewBox="0 0 36 36"
-              fill="none"
-              className="shrink-0 transition-transform group-hover:scale-105"
-            >
-              <rect
-                width="36"
-                height="36"
-                rx="10"
-                fill="url(#nav-logo-gradient)"
-              />
-              <path
-                d="M12 14L16 18L12 22M19 22H24"
-                stroke="white"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <defs>
-                <linearGradient
-                  id="nav-logo-gradient"
-                  x1="0"
-                  y1="0"
-                  x2="36"
-                  y2="36"
+          <Link href="/dashboard" className="flex items-center gap-2.5 group">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-accent-1 via-accent-2 to-accent-3 p-[1px] shadow-lg shadow-accent-2/20 group-hover:shadow-accent-1/40 transition-all duration-300">
+              <div className="w-full h-full bg-[#080b11] rounded-[11px] flex items-center justify-center">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="shrink-0 transition-transform group-hover:scale-110"
                 >
-                  <stop stopColor="#8B5CF6" />
-                  <stop offset="1" stopColor="#06B6D4" />
-                </linearGradient>
-              </defs>
-            </svg>
-            <span className="text-lg font-bold gradient-text">Clipzy</span>
+                  <path
+                    d="M7 8L11 12L7 16M13 16H17"
+                    stroke="url(#nav-logo-stroke)"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <defs>
+                    <linearGradient id="nav-logo-stroke" x1="7" y1="8" x2="17" y2="16">
+                      <stop stopColor="#06B6D4" />
+                      <stop offset="1" stopColor="#A855F7" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xl font-extrabold gradient-text tracking-tight">Clipzy</span>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-accent-1/10 text-accent-1 border border-accent-1/20 uppercase tracking-wider">AI</span>
+            </div>
           </Link>
 
           {/* Right side */}
           <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="btn-secondary text-sm py-2 px-4">
+            <Link
+              href="/dashboard"
+              className="text-sm font-medium px-4 py-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all"
+            >
               Dashboard
             </Link>
-            <button onClick={handleLogout} className="btn-icon" title="Logout" id="logout-btn">
+            <button
+              onClick={handleLogout}
+              className="btn-icon text-muted-foreground hover:text-danger hover:border-danger/40"
+              title="Keluar / Logout"
+              id="logout-btn"
+            >
               <svg
-                width="18"
-                height="18"
+                width="17"
+                height="17"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"

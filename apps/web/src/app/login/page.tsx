@@ -62,44 +62,38 @@ export default function LoginPage() {
       <div className="glass-card p-8 w-full max-w-md animate-fade-in-up relative z-10">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-3">
-            <svg
-              width="36"
-              height="36"
-              viewBox="0 0 36 36"
-              fill="none"
-              className="shrink-0"
-            >
-              <rect
-                width="36"
-                height="36"
-                rx="10"
-                fill="url(#logo-gradient)"
-              />
-              <path
-                d="M12 14L16 18L12 22M19 22H24"
-                stroke="white"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <defs>
-                <linearGradient
-                  id="logo-gradient"
-                  x1="0"
-                  y1="0"
-                  x2="36"
-                  y2="36"
+          <div className="inline-flex items-center gap-2.5 mb-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-accent-1 via-accent-2 to-accent-3 p-[1px] shadow-lg shadow-accent-2/30">
+              <div className="w-full h-full bg-[#080b11] rounded-[15px] flex items-center justify-center">
+                <svg
+                  width="26"
+                  height="26"
+                  viewBox="0 0 24 24"
+                  fill="none"
                 >
-                  <stop stopColor="#8B5CF6" />
-                  <stop offset="1" stopColor="#06B6D4" />
-                </linearGradient>
-              </defs>
-            </svg>
-            <h1 className="text-2xl font-bold gradient-text">Clipzy</h1>
+                  <path
+                    d="M7 8L11 12L7 16M13 16H17"
+                    stroke="url(#login-logo-stroke)"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <defs>
+                    <linearGradient id="login-logo-stroke" x1="7" y1="8" x2="17" y2="16">
+                      <stop stopColor="#06B6D4" />
+                      <stop offset="1" stopColor="#A855F7" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-3xl font-extrabold gradient-text tracking-tight">Clipzy</h1>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-accent-1/10 text-accent-1 border border-accent-1/20 uppercase tracking-wider">AI</span>
+            </div>
           </div>
           <p className="text-muted-foreground text-sm">
-            AI Video Clipper — Invite Only
+            AI Video Clipper — Studio Access
           </p>
         </div>
 
